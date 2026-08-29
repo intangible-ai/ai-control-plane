@@ -2,6 +2,16 @@
 
 **Version:** v1 · **Slice:** 01 of 08 · **Produces a number?** Yes, a crude one, on purpose.
 
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
+
 > Read `..\..\Shared Context\control_plane_thin_plan.md` before answering anything in this session.
 > This file is the contract for one chat. Stay inside it.
 
@@ -101,8 +111,11 @@ deliberate v1 limitation, so name it out loud in the session:
 | Streaming | we define the event shape | must reproduce someone else's SSE event names exactly |
 
 Wire-compat is arguably the better *product* decision and the worse *learning* decision. Plan §14
-lists it as a low-confidence call that Pass 2 may reverse. Say that; do not defend it as obviously
-right.
+lists it as a low-confidence call that a later pass may reverse. **Caveat under the new sequence:**
+the old "Pass 2 rewrite" no longer exists — position 13 is *"write the post, and extract only the
+policy pipeline,"* and a big-bang rewrite is ruled out as *"pure risk."* So wire-compat has no
+scheduled home any more. That is probably correct (its value is cheaper onboarding, and by position
+13 everything is already onboarded) but say it plainly rather than implying someone will get to it.
 
 ### 7. Where the timer goes — the headline metric in embryo
 

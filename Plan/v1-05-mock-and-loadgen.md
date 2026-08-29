@@ -2,6 +2,16 @@
 
 **Version:** v1 · **Slice:** 05 of 08 · **Produces a number?** This slice *is* the numbers.
 
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
+
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §7 (the SLO table) and §14 (which of those
 > numbers are guesses) before answering anything.
 >
@@ -10,6 +20,49 @@
 > lands here, so a sloppy measurement now poisons every later claim.
 >
 > **Large slice — planned split point in §7.**
+
+---
+
+# 0. Scope boundary against `#7` — read this before writing any code
+
+**This is the one slice the `LATEST EDIT` sequence directly changes, and getting the boundary wrong
+here either blocks position 0 or duplicates position 1.**
+
+The new sequence says of **position 1, `#7`**: *"builds the mock-LLM server and load generator that
+every later project reuses."* It also says of **position 0, this project**: *"a bounded queue that
+drops spans before user traffic is ever dropped."*
+
+Both cannot be satisfied by deleting this slice. Proving that spans are dropped *before user traffic
+is* requires user traffic, under load, with a store you can kill — and CLAUDE.md §4a requires **every
+project** to ship a benchmark harness, a beaten baseline, a failure mode and an SLO verdict. Position
+0 cannot reuse a tool that position 1 has not built yet.
+
+So the split is by **generality, not by existence**, and it is the portfolio's own extraction
+argument (plan §1: *frameworks are extracted from working systems, not designed ahead of them*)
+applied to its own tooling:
+
+| | **Position 0 — built here** | **Position 1 (`#7`) — built there** |
+|---|---|---|
+| `mockllm` | latency distribution, error/timeout/stall rates, SSE, `/_control`, seeded. **Enough to load and break the plane.** | **prefix-cache simulation** — hit/miss decided by comparing prompt prefix bytes, TTL expiry, the 4,096-token minimum, and the four usage fields derived from it |
+| `loadgen` | open-loop arrival, exact percentiles, achieved-vs-target, JSON results | **prompt corpora and workload shapes** — realistic prompts with stable/volatile segments, cache-hostile vs cache-stable variants |
+| Packaging | in-repo, `cmd/`, serves this project's SLOs | **extracted into a reusable tool** that `#9`, `#21`, `#35` and the rest import |
+
+**What that means in practice:**
+
+- Build the *narrow* versions here. Resist every feature that only a cache-optimisation project
+  needs. In particular: **do not implement prefix-cache hit/miss logic in `mockllm`.** This slice's
+  mock takes the four usage numbers as *configuration* — it does not decide them from prompt
+  content. That distinction is the whole boundary. (`v1-04` already relies on exactly this: usage
+  numbers we set, so the cost engine has something to price.)
+- Write the extraction hand-off in `bench/README.md`: what `#7` will need to add, and what should
+  move out of this repo when it does. Position 1 starts the day after this project ends; a
+  two-paragraph note now saves that session an hour of archaeology.
+- **Expect `#7` to reshape these tools, and say so.** If `#7` finds this `loadgen`'s scenario format
+  cannot express a cache-stable workload, that is the extraction working, not a mistake here.
+
+**Interview form, and it is a good one:** *"I built the minimum load tooling the control plane needed
+to prove its own SLOs, then extracted the reusable version in the next project once a second consumer
+existed to shape it. Designing the general tool first would have been designing from imagination."*
 
 ---
 
@@ -213,6 +266,8 @@ Decisions, with recommendations:
     be ~100ns per observation; confirm rather than assume.
 - **Scenario files are committed; result files are committed** (plan §7, deliverable 2: *"with the
   commit SHA and machine state beside every number"*).
+- **`bench/README.md` carries an "extraction hand-off to `#7`" section** — §0. Two paragraphs: what
+  position 1 will need to add to each tool, and what should move out of this repo when it does.
 
 ---
 
@@ -312,7 +367,7 @@ fresh, and the graph exists. Draft the post now, not at `v1-08`.
 # 6. Out of scope
 
 - **Optimising anything.** This slice *finds* numbers. If added latency misses by 3×, record it,
-  profile it, note the hypothesis — and fix it in `v1-07` or v2, with the before-number preserved.
+  profile it, note the hypothesis — and fix it in `v1-07`, with the before-number preserved.
   Optimising inside the measuring slice destroys the baseline it exists to create.
 - **Fault injection runs.** The *capability* is built here (`/_control`, error and stall rates); the
   *experiments* are `v1-07`. Do not start killing Postgres in this session.
@@ -323,7 +378,14 @@ fresh, and the graph exists. Draft the post now, not at `v1-08`.
   `loadgen` is enough. If a graph is needed for the write-up, generate it from the JSON with
   whatever is at hand and keep the script in `bench/`.
 - **Distributed load generation, multiple machines.** One laptop, honestly caveated (Concepts §7).
-- **Sampling.** Still `AlwaysSample`. The wall it would relieve is what we are measuring.
+- **Sampling of any kind.** Still `AlwaysSample`. **Tail-based sampling, always-keep-errors as a
+  sampling rule, and hard label/cardinality limits are position 7 (`#21`, voice)** in the new
+  sequence — *"voice is the first system emitting fast enough that full prompt-and-completion capture
+  is impossible."* Nothing here emits fast enough to force it, and forcing it early would mean
+  sampling away the very spans this project's SLOs are computed from.
+- **Anything only `#7` needs** — §0. Prefix-cache hit/miss simulation, prompt corpora, cache-stable
+  vs cache-hostile workload generation, and packaging either tool for external reuse. Usage numbers
+  are configuration here, never derived from prompt content.
 
 ---
 
@@ -364,7 +426,7 @@ is exactly how a benchmark ends up wrong.
   sustained spans/sec, the knee, and the surprise.
 - **§7 SLO table: a verdict on every row.** Targets unchanged.
 - Deliverable tracker: tick **1 (harness exists)** and **2 (baseline measured)** — note that "then
-  beaten" is still open and belongs to `v1-07`/v2.
+  beaten" is still open and belongs to `v1-07`.
 - §14: for each low-confidence claim, replace the prediction with the measurement and keep both
   visible.
 - Anything the baseline revealed that changes the shape of `v1-07` — if something is already

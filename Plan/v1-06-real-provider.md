@@ -1,7 +1,16 @@
 # Slice v1-06 — The real provider
 
-**Version:** v1 · **Slice:** 06 of 08 · **Produces a number?** Yes — and it is the only slice in v1
-that spends money.
+**Version:** v1 · **Slice:** 06 of 08 · **Produces a number?** Yes — and it is the only slice in v1 that spends money.
+
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
 
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §4a (the Bedrock position), §5 (pricing),
 > §7 (cost-accuracy SLO) and §10 (budget) before answering anything.
@@ -253,8 +262,9 @@ Notes for the session:
   numbers we invented. Plan §7's cost-accuracy SLO — *"token counts exact; USD within rounding of
   provider-reported"* — cannot be tested against a mock, by construction.
 - **Because the interface question should be asked while it is still cheap to answer.** Four slices
-  in, one gateway, no dependent projects. At Pass 2, with four systems onboarded, the same
-  discovery is a migration.
+  in, one gateway, no dependent projects. By position 13, with five modules and three system shapes
+  onboarded, the same discovery is a migration across seven dependents — which is exactly why the new
+  sequence refuses a big-bang rewrite there and extracts only the policy pipeline.
 - **Because `v1-07` needs a real error taxonomy to break.** Injecting faults is more convincing when
   the error classes came from a real provider's documented behaviour rather than from our own mock.
 - **Because it is cheap now and gets more expensive later.** ~₹42. Done after more of the system
@@ -358,7 +368,7 @@ Then five numbers:
 - **Fault injection against the real provider.** Faults are injected into `mockllm`, for free, at
   `v1-07`.
 - **The bounded queue.** Still absent. Still `v1-07`.
-- **Optimising the gateway.** If added latency regressed, record it; fix it in `v1-07` or v2 with the
+- **Optimising the gateway.** If added latency regressed, record it and fix it in `v1-07`, with the
   before-number intact.
 
 ---

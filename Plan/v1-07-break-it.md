@@ -2,6 +2,16 @@
 
 **Version:** v1 · **Slice:** 07 of 08 · **Produces a number?** Several — and **deliverable #3**.
 
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
+
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §7 (*"The failure mode we expect to find"*)
 > and the corrected prediction recorded during `v1-03` before answering anything.
 >
@@ -10,6 +20,30 @@
 > against a prediction is a finding — and only one of those is worth writing up.
 >
 > **Large slice — planned split point in §7.**
+
+### What the `LATEST EDIT` sequence changed about this slice
+
+The bounded span queue **is no longer a fix this slice might discover — it is position 0's stated
+scope**: *"The telemetry half of backpressure lives here too — a bounded queue that drops spans
+before user traffic is ever dropped — because that is the only half of the old Pass 2 spike work that
+can be built and proved against a single system."*
+
+Three consequences, and the first is the one that could go wrong:
+
+1. **The measure → break → fix ordering does not change.** It is tempting to read "required scope"
+   as "so build it in `v1-03` and skip the experiment." Do not. The requirement is that the queue
+   **exists and is proved**; the proof *is* the before-number. Plan §7's instruction still stands
+   verbatim — *"Do not let a later session 'helpfully' skip ahead and implement the queue in slice
+   03."* The sequence made the destination mandatory, not the route shorter.
+2. **The queue can no longer be dropped if the faults turn out benign.** Previously (§2) the honest
+   move if faults 1 and 7 caused no user-visible damage was to write that up and not build a fix.
+   That option is gone: the queue ships either way. What *does* stay data-driven is **which fault is
+   the headline**, and what else gets fixed. If the queue turns out to prevent nothing measurable,
+   **that is the finding** — write it up as "position 0 required this and here is what it actually
+   bought, measured" rather than manufacturing a disaster it saved you from.
+3. **The word "proved" is doing work.** Position 0 asks for a queue *proved against a single system*.
+   A queue with no fault run behind it is asserted, not proved. This slice is that proof, and it is
+   the reason the slice survives the resequencing intact.
 
 ---
 
@@ -110,6 +144,22 @@ That is a genuinely good design detail: the drop policy is derived from a stated
 requirement rather than from convenience. Whichever is chosen, **the counter is not optional** —
 an uncounted drop is data loss you cannot even report.
 
+**Do not confuse this with sampling — the new sequence separates them deliberately.** Two different
+mechanisms that both discard spans:
+
+| | **Queue drop policy — here, position 0** | **Tail-based sampling — position 7 (`#21`)** |
+|---|---|---|
+| When it decides | at enqueue, when the queue is already full | after the trace completes, on every trace |
+| Why it discards | it physically cannot keep up right now | keeping everything is structurally impossible at this volume |
+| Normal-load behaviour | **never fires** — a drop is an incident signal | fires constantly, by design |
+| Scope of the decision | one span, in one process | the whole trace, centrally |
+
+The new sequence puts *"tail-based sampling, always-keep-errors and hard label limits"* at position
+7 because voice is the first system emitting fast enough to force them. Position 0 keeps everything
+(`AlwaysSample`, `v1-02`) and drops only under duress — and **`cp_spans_dropped_total` reading
+nonzero at normal load is a bug, not a policy working.** Say that in the metric's help text, because
+the two mechanisms are easy to conflate later when both exist.
+
 ### 6. Fail-open or fail-closed, decided per component and written down
 
 `v1-00` §5.4 gave the definitions; here every component gets an explicit answer, and the answer goes
@@ -197,9 +247,12 @@ and the writer, with an explicit priority drop policy (Concepts §5), `cp_spans_
 incremented on every drop, and a `/metrics`-visible queue depth. Plan §7 names this as the planned
 fix — *"drop telemetry before ever dropping user traffic."*
 
-**Do not fix more than the data justifies.** If faults 1 and 7 turn out to be benign because the
-batch exporter was already async, then the queue is *not* the finding, and inventing a fix for a
-problem that did not occur is the same dishonesty as hiding one that did. Fix what actually broke.
+**Do not fix more than the data justifies** — with the one exception the sequence now imposes. The
+bounded queue ships regardless (see the note under the header): position 0 requires it. Everything
+*else* stays data-driven. If faults 1 and 7 turn out to be benign because the batch exporter was
+already async, then the queue is not the *headline* finding, and inventing a disaster it rescued you
+from is the same dishonesty as hiding one that happened. Build the queue, measure what it actually
+bought, and report that honestly — including "less than expected, and here is why."
 
 ---
 
@@ -285,19 +338,34 @@ narrative the entire portfolio is built to produce. Draft it now.
 
 - **Fixing every fault found.** Fix the worst user-visible one, plus anything that is a two-line
   correctness bug (a missing deadline, an unrecovered panic). Everything else is written up and
-  becomes a candidate v2 slice. A slice that tries to fix seven faults finishes none.
+  is written up and handed to whichever position owns it (§8a of `v1-08`). A slice that tries to fix
+  seven faults finishes none.
 - **Faults against the real provider.** ₹0 slice. All injection is local.
+- **The user-traffic half of backpressure.** The new sequence is explicit: *"Backpressure's
+  user-traffic half belongs here"* — at **position 11 (`#35`, the router)** — *"shed with deadlines,
+  admission control, and degrade to a cheaper model, because degrading to a cheaper model is
+  structurally impossible before a router exists."* So: shedding *user requests*, admission control,
+  and any degrade-to-cheaper-model path are **out**. What stays in is the telemetry half (the span
+  queue), shedding on the *OTLP ingest* endpoint (that is telemetry traffic, not user traffic), and
+  plain deadlines on outbound calls, which are hygiene rather than admission control.
 - **Circuit breakers.** Tempting and probably premature: with two providers and no fan-out, a
-  breaker adds a state machine and a new failure mode of its own. Note it as a v2 candidate **if**
-  the data shows repeated hammering of a dead dependency; do not add it on principle.
-- **Sampling, ClickHouse, columnar storage.** Plan §13. If the ingest wall is the finding, it
-  *justifies* those as v2 slices — recording that justification is the deliverable, not building it.
+  breaker adds a state machine and a new failure mode of its own. Note it as a candidate for
+  position 11 (`#35`) **if** the data shows repeated hammering of a dead dependency; do not add it
+  on principle.
+- **Tail-based sampling and cardinality limits.** Position 7 (`#21`) — see Concepts §5.
+- **ClickHouse / columnar storage.** Now **position 8 (`#30-store`)**, so it has a home and is not
+  this slice's problem. What *is* this slice's job is handing that project its justification: if the
+  fault runs expose an ingest wall, record the number, the hardware and the commit beside it.
+  Position 8 opens with *"measured the wall at N spans/sec"* — `v1-03`, `v1-05` and this slice are
+  collectively where N comes from. If the wall never materialises, say so plainly; position 8's own
+  entry allows for being cancelled by the measurement.
 - **Chaos-engineering frameworks, service meshes, fault-injection proxies.** `docker compose stop`
   and an HTTP control endpoint are sufficient and comprehensible. A framework here would add a
   dependency and obscure the mechanism.
 - **Multi-node, replication, failover.** One machine. v1 measures a single instance honestly.
-- **Rewriting the collector for throughput.** If ingest is the bottleneck, that is a measured v2
-  slice with a before-number — not an in-flight rewrite inside the slice that produced the number.
+- **Rewriting the collector for throughput.** If ingest is the bottleneck, that is position 8's
+  problem (`#30-store`), armed with the before-number produced here — not an in-flight rewrite inside
+  the slice that produced the number.
 
 ---
 
@@ -341,13 +409,14 @@ repo.
   including whichever was wrong. Plan §14's whole point is that a stated-then-missed prediction is
   an asset.
 - **Deliverable tracker:** tick 2 (baseline beaten) and 3 (failure mode found and written up).
-- **§13:** any deferred item this slice's data now *justifies* — sampling, ClickHouse, breakers —
-  each with the number that justifies it. This is the seed of the v2 plan, and per plan §3, v2
-  planning starts from these numbers and these failures, never from imagination.
+- **Hand-offs:** any deferred item this slice's data now *justifies* — tail sampling (position 7),
+  the columnar store (position 8), circuit breakers (position 11) — each with the number that
+  justifies it. There is no v2 of this project to collect them (`v1-08` §8); they belong to the
+  positions that own them, and they travel as numbers, never as opinions.
 
 ---
 
 # Next
 
 `v1-08` — onboard and write up. A ~50-line Python agent through Door A with the stock OTel SDK, one
-trace spanning two languages, the README, the final SLO scorecard, and the v1 → v2 gate.
+trace spanning two languages, the README, the final SLO scorecard, and the done gate.

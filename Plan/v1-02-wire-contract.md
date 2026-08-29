@@ -1,7 +1,16 @@
 # Slice v1-02 — The wire contract
 
-**Version:** v1 · **Slice:** 02 of 08 · **Produces a number?** Yes — bytes/span, and a first crude
-telemetry-overhead reading.
+**Version:** v1 · **Slice:** 02 of 08 · **Produces a number?** Yes — bytes/span, and a first crude telemetry-overhead reading.
+
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
 
 > Read `..\..\Shared Context\control_plane_thin_plan.md` (§5 especially) before answering anything.
 > **This slice ends with a decision** — plan §12.4, Go vs TypeScript for the gateway. Do not skip it.
@@ -40,6 +49,14 @@ Why we care beyond aesthetics: plan §11 makes the trace DAG a hard constraint i
 **#30-S**, whose most valuable analysis is critical-path (`v1-00` §4.4). Critical path is computed
 by walking parent links. A broken `parent_span_id` does not degrade that analysis — it deletes it.
 
+**And the deadline for getting this right just moved much closer.** The `LATEST EDIT` sequence
+promotes **`#30-S L1` — critical path and tail attribution — to position 4**, on the reasoning that
+*"the analyzer is the thesis, not the epilogue... without any analyzer the plane is just another
+observability clone."* That is four projects away, not fourteen. The parent/child linking written in
+this slice is the input to the single analysis the whole plane is differentiated by, and it will be
+exercised for real within months rather than at the end. Treat the two-span tree produced here as a
+contract with position 4, not as plumbing.
+
 ### 2. Context propagation and the `traceparent` header
 
 Inside one process, the parent link is carried by `context.Context`: `tracer.Start(ctx, name)` looks
@@ -71,7 +88,7 @@ architecture:
 |---|---|---|
 | **Semantic conventions** | attribute *names* — `gen_ai.usage.input_tokens` | this is the contract; changing it is a breaking change |
 | **SDK** | `go.opentelemetry.io/otel` + `otel/sdk/trace` — creates, batches, samples | yes, per language; a tenant uses their own |
-| **OTLP** | protobuf over HTTP on `:4318/v1/traces` — the bytes | yes, gRPC is the alternative (plan §12.3 defers it) |
+| **OTLP** | protobuf, over HTTP on `:4318/v1/traces` or gRPC on `:4317` — the bytes | both are in scope; we export over HTTP and receive on both (`v1-03`) |
 
 **We ship no SDK.** Tenants use the stock one for their language. What we publish is the vocabulary
 and the endpoint.
@@ -314,8 +331,12 @@ the next slice into an experiment instead of an observation.
   thing from OTel metrics. Do not build an OTel metrics pipeline here.
 - **Sampling of any kind.** `AlwaysSample`, deliberately (plan §2).
 - **Auto-instrumentation, monkey-patching, `otelhttp` middleware magic.** Plan §2 puts zero-code
-  instrumentation in Pass 2. Wire the spans by hand — you cannot debug a tree you never assembled.
-- **gRPC OTLP on :4317** — plan §12.3, deferred.
+  instrumentation to a later pass. Note that the new sequence schedules no such pass — position 12
+  extracts *only* the policy pipeline — so auto-instrumentation is currently unhomed and should not
+  be promised in a README. Wire the spans by hand — you cannot debug a tree you never assembled.
+- **gRPC OTLP on :4317** — not deferred any more (position 0's description now names both
+  transports), but it belongs to `v1-03` with the rest of the receiver, not here. This slice only
+  *exports*, over HTTP.
 - **Streaming, mockllm, loadgen, the Anthropic adapter.** Slices 05 and 06.
 - **Fixing the `BatchSpanProcessor` silent-drop blind spot.** Noted in Concepts §4, deliberately
   left broken, found and fixed with a before-number at `v1-07`.

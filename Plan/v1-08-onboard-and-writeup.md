@@ -1,7 +1,16 @@
 # Slice v1-08 — Onboard a tenant, and write it up
 
-**Version:** v1 · **Slice:** 08 of 08 · **Produces a number?** Yes — **the portfolio's own headline
-metric.**
+**Version:** v1 · **Slice:** 08 of 08 · **Produces a number?** Yes — **the portfolio's own headline metric.**
+
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
 
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §2 (what v1 is *not*), §6 (the six things),
 > §7 (the four deliverables and the SLOs) and §14 (confidence) before answering anything.
@@ -48,7 +57,10 @@ migration when you leave. Our cost is boilerplate that is portable to any OTLP r
 Say it that way, because that is the actual argument.
 
 And name the limitation in the same breath, because plan §2 already did: **this is not zero-code
-onboarding.** Tier-1 auto-instrumentation and a wire-compatible proxy are explicitly Pass 2. A
+onboarding.** Tier-1 auto-instrumentation and a wire-compatible proxy were deferred to "Pass 2" —
+which the new sequence has replaced with position 13, *"extract only the policy pipeline."* Neither
+has a scheduled home now, so state the limitation as permanent-until-rescheduled rather than as
+coming-later. A
 README that implies otherwise is the thing plan §2 was written to prevent — *"Named here so it does
 not get quietly claimed in a README."*
 
@@ -170,6 +182,12 @@ Notes for the session:
   obvious from the Python side.
 - **The agent must do both doors**: emit its own spans (Door A) *and* call `POST /v1/chat` with a
   propagated `traceparent` (Door B). One door alone does not demonstrate the architecture.
+- **Shape the example to prefigure position 1.** The next project is `#7`, the prefix-cache-aware
+  context assembler, and the sequence says *"every project after this emits telemetry from day one."*
+  So make the example agent assemble a prompt from a stable preamble plus a volatile question, and
+  emit the four usage fields. It costs nothing extra — that is a realistic agent anyway — and it
+  means `#7` starts from a working, instrumented tenant instead of a blank file. **Do not implement
+  any cache optimisation here.** The example just has to have the shape that `#7` will optimise.
 - `provider.shutdown()` in a `finally` (Concepts §5).
 - **`examples/agent-python/README.md` is written for someone who has never seen this repo.** That
   framing is the test — if it needs a paragraph explaining our internals, the contract is leaking.
@@ -189,9 +207,9 @@ Notes for the session:
 - **Because the numbers exist and the write-up is the deliverable.** AGENT_INSTRUCTIONS: *"two or
   three good engineering blog posts outperform ten repos."* The numbers, the graphs and the fault
   story are all on disk right now. This is when they are cheapest to turn into prose.
-- **Because v2 cannot be planned until v1 is closed.** Plan §3: v2 slices are written from what the
-  v1 numbers and failures actually showed. The scorecard produced here is the input to that planning
-  session.
+- **Because position 1 cannot start until this project is closed.** The gate in §8 is a measurement,
+  not a feeling, and the scorecard produced here is what `#7` inherits — including the baseline
+  hand-off that position 8 (`#30-store`) will need.
 
 ---
 
@@ -220,7 +238,7 @@ Notes for the session:
 - [ ] no secret in the repo — `.env` ignored, no key in any committed file or any span
 - [ ] plan §15 has a `v1-08` row; **all four deliverables ticked**
 - [ ] the blog post is drafted (not necessarily published)
-- [ ] the v1 → v2 gate in §6 is explicitly declared
+- [ ] the done gate in §8 is explicitly declared — all three conditions, individually
 
 ---
 
@@ -248,7 +266,7 @@ Notes for the session:
    - the target **as originally stated**,
    - the measured result,
    - hit or missed,
-   - and for each miss, why, and whether it becomes a v2 slice.
+   - and for each miss, why, and whether it is beaten before the project closes or reported as a miss.
 
    Include the ones re-baselined at `v1-03` with **both** numbers visible. Plan §14 is unambiguous
    about why: *"A missed SLO that was stated in advance is a finding worth writing up. A missed SLO
@@ -262,15 +280,20 @@ Notes for the session:
 # 6. Out of scope
 
 - **A second example agent, or another language.** One is the proof. Two is repetition.
-- **Auto-instrumentation for Python** (`opentelemetry-instrument`, monkey-patching). Plan §2: Pass 2.
-  Tempting because it would make the LOC number look better — which is exactly the wrong reason.
+- **Auto-instrumentation for Python** (`opentelemetry-instrument`, monkey-patching). Plan §2 deferred
+  it and the new sequence does not reschedule it. Tempting because it would make the LOC number look
+  better — which is exactly the wrong reason.
 - **Onboarding a real portfolio project (#9, #1, #21).** Those are their own projects with their own
   slices. This slice proves the door works.
-- **A dashboard or UI.** Plan §2. `cpq` and SQL.
-- **Any optimisation.** v1 ends here. Every improvement identified belongs in the v2 plan with the
-  number that justifies it.
-- **Writing v2 slice files.** Plan §3 is explicit — v2 is planned in its own session, from these
-  numbers. Not now, and not from imagination.
+- **A dashboard or UI.** Plan §2 — `cpq` and SQL here. The portfolio's cross-cutting rule allows
+  exactly one narrow view per project where it makes the headline number legible, and for the plane
+  that view is the **trace waterfall with the critical path highlighted**, which belongs to
+  position 4 (`#30-S L1`) where there is finally a critical path to draw. This project's headline
+  output is a table of percentiles, which reads perfectly well as text.
+- **Any optimisation beyond beating a stated SLO.** The project ends here. Improvements that belong
+  to another position (§8a) go in the plan file as a hand-off, not into this repo.
+- **Writing v2 slice files.** There is no v2 for this project (§8). The next planning session is
+  position 1's, and it is a fresh session.
 - **Publishing the blog post.** Drafting it is in scope; publishing is the user's call and their
   voice.
 
@@ -299,27 +322,101 @@ Then the four deliverables (plan §7):
 
 ---
 
-# 8. The v1 → v2 gate
+# 8. The done gate — and why there is no v2
 
 Plan §3 and AGENT_INSTRUCTIONS define the gate as a measurement, not a feeling:
 
 > *"v1 ends when the benchmark harness runs, the baseline numbers exist, and the system has been
 > deliberately broken at least once."*
 
-Declare it explicitly in this session. If any of the three is not true, **v1 is not finished** and
+Declare all three explicitly in this session. If any is not true, **the project is not finished** and
 the missing piece is the next slice — regardless of how complete the code looks.
 
-If it is true, write into the plan file what v2 planning starts from. Candidates already have
-evidence attached, and each should carry its number:
+**What that gate now opens is position 1 (`#7`), not a v2 of this project.** `CLAUDE.md` §3's
+v1/v2 protocol is portfolio-wide and still governs other projects; for `#30-thin` specifically it has
+exactly one member, because the `LATEST EDIT` resequencing gave every would-be v2 item its own
+numbered position — see the table in §8a. The last candidate, the columnar store migration, became
+position 8 (`#30-store`).
 
-- the ingest wall from `v1-03`/`v1-05` → sampling, or ClickHouse
-- any missed SLO from `v1-05` → the specific optimisation, with the profile that points at it
-- anything found at `v1-07` and deliberately not fixed
-- plan §12.4's language decision, if it is worth revisiting with real evidence
-- plan §14's low-confidence claims that turned out wrong
+The only optimisation work left inside this project's own boundary is **beating a baseline it
+measured itself** — a missed SLO from `v1-05`, profiled and fixed. That is not a version 2; plan §7
+and CLAUDE.md §4a put *"a baseline that was measured and beaten"* inside the definition of done, and
+`v1-07` already runs that loop in-slice. If an SLO is missed and not beaten, say so in the scorecard
+and move on: an honestly reported miss is an asset (plan §14), and manufacturing a v2 to hide it is
+not.
+
+So record in the plan file, at the close of this session:
+
+- the three gate conditions, each confirmed
+- the SLO scorecard, misses included
+- **the baseline hand-off to position 8** (§8a)
+- anything found at `v1-07` and deliberately not fixed, with the number beside it
+- plan §12.4's language decision, and plan §14's low-confidence claims that turned out wrong
 - the open Bedrock/AWS question from plan §4a, if it was ever answered
 
-**v2 slices are written in a fresh session, from these numbers.** Not in this one.
+Then stop. **Do not write v2 slice files for this project** — there is no v2 *inside the plan* to
+plan. The next planning session is position 1's.
+
+One caveat, so "there is no v2" is not read as "this is finished forever": a v2 can also be
+optimization work that sits **entirely outside the portfolio plan**, taken up separately once the
+user has finished the plan, on whichever projects the numbers say are worth going back to. This
+project will very likely be one of them — a spine that seven things depend on, with a full set of
+measurements attached, is an obvious candidate. That is a *later, optional* pass, deliberately not
+scheduled, and it is not a reason to hold anything back from v1 now.
+
+**One case that looks like a v2 and is not:** a later project needing the plane changed — `#9`
+wanting something new through Door A, or `#21` finding the span schema too narrow. That is
+maintenance of a dependency, done inside whichever project needs it, and position 13 (`#30
+extraction`) is where the accumulated lessons get written up. Neither is a version of this project.
+
+---
+
+### 8a. Where each deferred item actually went
+
+There is no scheduled "come back and rewrite the plane" project. Position 13 is *"write the post,
+and extract **only** the policy pipeline,"* and it explicitly rules out more: *"a big-bang rewrite of
+a foundation seven things depend on is pure risk."*
+
+Everything this project deliberately deferred now has a *named position elsewhere*. This table is the
+full inventory, and it is why §8 says there is no v2 — nothing on it is this project's work:
+
+| Deferred from v1 | Now lives at |
+|---|---|
+| Reusable mock-LLM + load generator | position 1 (`#7`) |
+| Tail-based sampling, cardinality/label limits | position 7 (`#21`) |
+| User-traffic shedding, admission control, degrade-to-cheaper | position 11 (`#35`) |
+| Budget enforcement, per-feature attribution | position 12 (`#29`) |
+| Hot-reloadable policy pipeline, PII and schema guards | position 13 |
+| Critical-path / tail attribution over the DAG | position 4 (`#30-S L1`) |
+| Eval, accuracy, LLM-as-judge | position 6 (`#27`) |
+
+**The one that was homeless is now placed — and this project owes it a number:**
+
+> **The ClickHouse / columnar migration is position 8 (`#30-store`)**, added to the sequence after
+> `#21` on the reasoning that the pressure forcing sampling at position 7 is the same pressure that
+> makes row storage the wrong shape.
+>
+> That resolves *where* it happens. It does **not** remove an obligation from this project. Position
+> 8's premise is a quotation of plan §4a — *"I built on Postgres, measured the wall at N spans/sec,
+> and moved to ClickHouse for a 12x ingest improvement"* — and **N is measured here**, at `v1-03`,
+> `v1-05` and `v1-07`. So the hand-off is concrete:
+>
+> - the sustained spans/sec ceiling, with hardware, commit SHA and index configuration beside it
+> - what saturated first (write path, index maintenance, connection pool, CPU)
+> - the batch-size curve from `v1-03` §5, because it tells position 8 what to compare against
+> - whether the wall was hit at all — position 8 explicitly allows the measurement to cancel it, and
+>   "Postgres held at portfolio volumes" is a publishable result, not a failure to find a problem
+>
+> Put that in the README and in plan §15. A migration project that has to re-derive its own baseline
+> has lost the argument before it starts.
+
+Two smaller ones stay dead, and that is the right call: **wire-compatible drop-in proxy mode** and
+**tier-1 auto-instrumentation** were both deferred to the old Pass 2 and were deliberately *not*
+given a position. Their only real value is cheaper onboarding, and by the end of the sequence every
+tenant is already onboarded — so they would improve a number for a population of zero. State the
+limitation in the README as permanent-until-rescheduled, not as coming later. (If wire-compat is
+ever revived, the argument that would justify it is adoptability of the **router** at position 11,
+not onboarding cost here.)
 
 ---
 
@@ -340,8 +437,9 @@ evidence attached, and each should carry its number:
 - §15 row for `v1-08`: commit SHA, **LOC-to-onboard**, cross-language trace completeness, the
   surprise.
 - **Deliverable tracker: all four ticked**, or an explicit statement of which is not and why.
-- **The v1 → v2 gate declared**, with the three conditions individually confirmed.
-- **The v2 input list** — every candidate with the number that justifies it.
+- **The done gate declared**, with the three conditions individually confirmed.
+- **The hand-off list** — every deferred item, its position from §8a, and the number that justifies
+  it. The baseline hand-off to position 8 (`#30-store`) is the one with a hard dependency on it.
 - **Status line at the top of the plan file** updated from *planned, not started* to v1 complete,
   dated, with the repo URL.
 - §10: total v1 spend against the ₹2,000 ceiling.
@@ -354,6 +452,6 @@ evidence attached, and each should carry its number:
 
 # Next
 
-**Nothing in v1.** The next session is either the v2 planning session — which starts from the
-scorecard and the failure modes, never from imagination — or the next portfolio project, which the
-user chooses (CLAUDE.md §1: *do not assume the next project — ask or wait*).
+**Nothing — this project is finished.** The build sequence says the next thing is **position 1,
+`#7`**, and its planning session starts from this project's scorecard. But CLAUDE.md §1 still
+governs: *do not assume the next project — ask or wait.*

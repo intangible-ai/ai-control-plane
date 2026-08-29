@@ -2,6 +2,16 @@
 
 **Version:** v1 · **Slice:** 03 of 08 · **Produces a number?** Yes — and it **re-baselines an SLO**.
 
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
+
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §5 (schema), §7 (SLOs) and §14 (the
 > ingest SLO is flagged as a guess) before answering anything.
 >
@@ -101,12 +111,21 @@ moment to explain why the tree is reconstructed at read time, not enforced at wr
 
 The gateway has been speaking OTLP since `v1-02`; now we implement the other end.
 
-- **Transport:** HTTP POST to `/v1/traces` on `:4318`. Body is a protobuf-encoded
-  `ExportTraceServiceRequest`. Decode with the generated types in
+- **Transport: both, and gRPC is required scope.** HTTP POST to `/v1/traces` on `:4318`, and the
+  `TraceService/Export` gRPC method on `:4317`. Body is a protobuf-encoded
+  `ExportTraceServiceRequest` either way. Decode with the generated types in
   `go.opentelemetry.io/proto/otlp/collector/trace/v1` — never hand-roll protobuf.
+  **Why both, and why it is not optional:** position 0's description in the portfolio's build
+  sequence names both transports, because *several language SDKs reach for gRPC the moment you
+  install "the OTLP exporter"*, and a connection refused on `:4317` would quietly falsify the
+  vendor-neutral claim the whole project rests on. It is cheap — the OTLP proto already ships the
+  gRPC service definition, so it is a second listener in front of **the same conversion code**.
+  Build HTTP first because it is curl-debuggable, then register the gRPC service over the identical
+  `convert.go` path. If the two transports ever need different conversion logic, something has gone
+  wrong in the layering.
 - **Also accept `Content-Type: application/json`.** OTLP/HTTP officially supports a JSON encoding,
   and being able to `curl` a span into your own collector while debugging is worth the twenty lines.
-  This is the reason plan §12.3 chose HTTP over gRPC first.
+  This is why HTTP is built first — it is the one you can debug with `curl`.
 - **Nesting:** the payload is `ResourceSpans → ScopeSpans → Span`. Resource attributes
   (`service.name`) live at the top and apply to every span underneath — so flattening one request
   into rows means copying resource attributes down. Miss that and every span in your table has a
@@ -213,11 +232,12 @@ Spans stop being printed and start being stored, in our own collector, in Postgr
       insert.go             <- the deliberately naive single-row writer
       query.go              <- one-trace fetch, ordered for tree assembly
     otlp/
-      receiver.go           <- POST /v1/traces, protobuf + JSON decode
+      receiver_http.go      <- POST /v1/traces on :4318, protobuf + JSON decode
+      receiver_grpc.go      <- TraceService/Export on :4317, same convert.go path
       convert.go            <- ResourceSpans -> []store.Span, resource attrs flattened down
   cmd/
     collector/
-      main.go               <- :4318 receiver + pool + shutdown
+      main.go               <- :4318 and :4317 receivers + pool + shutdown
     cpq/
       main.go               <- query CLI: `cpq trace <hex-id>` prints the tree
 ```
@@ -226,7 +246,7 @@ Decisions to make, with recommendations:
 
 - **Driver: `pgx/v5` with `pgxpool`, not `database/sql`.** Reasons, in order: native `bytea` and
   `numeric` handling (we have both, and `numeric` through `database/sql` is a string-shaped
-  nuisance); `CopyFrom` is right there for when `v1-07`/v2 needs bulk ingest; and the pool exposes
+  nuisance); `CopyFrom` is right there for when `v1-07` needs bulk ingest; and the pool exposes
   the stats we want at `v1-07` (acquire count, wait duration) — pool exhaustion is one of the
   failure modes we are hunting.
 - **Migrations: numbered `.sql` files mounted into `/docker-entrypoint-initdb.d`.** Simple, no extra
@@ -280,6 +300,8 @@ Decisions to make, with recommendations:
       today
 - [ ] **no foreign key** on `parent_span_id` — and the session can say why in one sentence
 - [ ] `cmd/collector` listens on `:4318` and accepts `POST /v1/traces` as protobuf **and** as JSON
+- [ ] `cmd/collector` also serves OTLP/gRPC `TraceService/Export` on `:4317`, over the **same**
+      conversion code — verified by sending the same trace both ways and getting identical rows
 - [ ] resource attributes (`service.name`) are flattened onto every span row
 - [ ] the OTLP response carries partial-success information when some spans are rejected
 - [ ] the chosen HTTP status for a store failure is deliberate and the reason is in a comment
@@ -347,8 +369,12 @@ thing that makes a portfolio worthless."*
   partitions this slice needs by hand; automation without a retention policy is decoration.
 - **A GIN index on `attributes`.** Expensive on write, and no query needs it yet. Note it as
   available and move on.
-- **ClickHouse, columnar storage, compression.** Plan §13 — v2, justified by the wall this slice
-  starts measuring.
+- **ClickHouse, columnar storage, compression.** Out of scope here — that is now **position 8
+  (`#30-store`)** in the build sequence, placed after `#21` because voice is the first system
+  emitting fast enough to force the question. **But the number that justifies it is produced here**:
+  position 8's entire premise is *"measured the wall at N spans/sec"*, and this slice is where N
+  first gets measured. Do not migrate; do measure, and record the figure somewhere position 8 can
+  find it.
 - **A UI, a dashboard, Grafana.** Plan §2: a query CLI and SQL.
 - **Auth on the OTLP endpoint.** Localhost only in v1. Say so in the README rather than implying a
   security property that does not exist.
@@ -360,8 +386,10 @@ thing that makes a portfolio worthless."*
 This slice is two sessions' worth of work if anything goes sideways. The split is pre-declared so
 that stopping is a plan rather than a failure:
 
-**`v1-03a` — spans land.** Compose + Postgres, `0001_spans.sql`, the OTLP receiver, the naive
-writer. Done when one `POST /v1/chat` produces two correct rows and `psql` can see them.
+**`v1-03a` — spans land.** Compose + Postgres, `0001_spans.sql`, the OTLP/HTTP receiver, the naive
+writer. Done when one `POST /v1/chat` produces two correct rows and `psql` can see them. Add the
+gRPC listener at the end of 03a if there is time — it is small, and it is the same conversion path —
+otherwise it is the first thing in 03b.
 
 **`v1-03b` — spans are useful.** `cmd/cpq`, the tree query, partition-pruning check, the four
 measurements in §5, the SLO re-baseline.

@@ -1,7 +1,16 @@
 # Slice v1-04 — Cost accounting
 
-**Version:** v1 · **Slice:** 04 of 08 · **Produces a number?** Yes — the one the portfolio's #7
-later depends on being trustworthy.
+**Version:** v1 · **Slice:** 04 of 08 · **Produces a number?** Yes — the one the portfolio's #7 later depends on being trustworthy.
+
+> **Build-sequence note (added after the portfolio's `LATEST EDIT` revision).** This project is
+> **position 0 — `#30-thin`, the control plane spine** — in the only build sequence now in force.
+> That section supersedes Parts 10, 11 and 12 of the portfolio file. Position 0's scope is stated
+> there as: *"OTel GenAI spans, token and cost accounting, a trace store, and the provider adapter
+> interface... The telemetry half of backpressure lives here too — a bounded queue that drops spans
+> before user traffic is ever dropped."* Two consequences run through every slice below:
+> **(a)** the bounded span queue is now **required scope**, not a discovered fix; and
+> **(b)** what comes next is **position 1, `#7` (prefix-cache-aware context assembler)**, which is
+> where the *reusable* mock-LLM server and load generator belong. See `v1-05` §0.
 
 > Read `..\..\Shared Context\control_plane_thin_plan.md` §5 ("The cost model is not
 > `input × price_in + output × price_out`") before answering anything.
@@ -262,16 +271,25 @@ Decisions, with recommendations:
   — added at `v1-06` — `partial_stream`. The column was created back in `v1-03`, so no migration is
   needed here. If it was missed, the `initdb.d` trigger from `v1-03` fires and a real migration
   runner arrives now.
-- **Roll-ups as plain SQL views** in v1. A materialised view or a rollup table is a v2 slice
-  justified by a slow query, not by anticipation (plan §13, and plan §4a's whole argument).
+- **Roll-ups as plain SQL views.** A materialised view or a rollup table needs a slow query to
+  justify it, not anticipation (plan §4a's whole argument). If one shows up, it is a fix inside this
+  project; if the pressure is storage-shaped rather than query-shaped, it is position 8.
 
 ---
 
 # 3. Why now
 
-- **Because it is a *dependency*, not a feature.** Plan §5 and §11: #7's dollar figure is
-  unmeasurable without a cache-aware engine here. Plan §5 states outright that this is *"the reason
-  cost accounting is in Phase 0 and not later."*
+- **Because it is a *dependency*, not a feature — and `#7` is now the very next project.** Plan §5
+  and §11: `#7`'s dollar figure is unmeasurable without a cache-aware engine here. Under the
+  `LATEST EDIT` sequence `#7` is **position 1, immediately after this one**, described as *"it turns
+  prompt ordering into a dollar figure, the easiest real number to publish."* This slice is the
+  instrument that produces that figure. There is no longer any slack in the schedule between
+  building the measurement and needing it: if the four-field arithmetic is wrong here, the next
+  project's headline claim is wrong, and nothing in between will catch it.
+- **Because position 12 (`#29`) is explicitly built on top of it.** The sequence says `#29` is
+  *"cheap and quick here because #7 and #35 have already built most of the accounting underneath
+  it."* Some of that accounting is actually this slice's — per-tenant, per-route, per-model roll-ups.
+  Getting the dimensions right now is what makes that later claim true.
 - **Because rows exist now and load does not yet.** Pricing arithmetic is much easier to verify
   against ten hand-checked rows than against a benchmark run. Do the exact arithmetic while the data
   is small enough to check with a calculator.
@@ -347,14 +365,17 @@ Four numbers. The second is the one that matters to the portfolio.
 # 6. Out of scope
 
 - **Budget enforcement, spend caps, throttling, alerts.** Plan §2: *"Not a policy engine."*
-  Enforcement is #29 territory and Pass 2. This slice **reports**, it does not **govern**. Naming
+  Enforcement is **position 12 (`#29`)** — *"budgets that degrade gracefully instead of failing
+  hard... cheap and quick here because #7 and #35 have already built most of the accounting
+  underneath it."* That accounting is what this slice builds. This slice **reports**, it does not
+  **govern**. Naming
   the difference between reporting and enforcement is worth a sentence in the README.
 - **Real provider calls or real money.** `v1-06`. Everything here runs on mock usage numbers, ₹0.
 - **A pricing API or auto-updating prices.** A dated file, edited by a human, is the correct design
   for something that must be auditable.
 - **Multi-currency, INR conversion.** Store USD. Convert at display if ever needed; a stored,
   converted number carries a hidden exchange-rate date and becomes unauditable.
-- **Materialised views, rollup tables, pre-aggregation.** v2, if a query is slow.
+- **Materialised views, rollup tables, pre-aggregation.** Only if a query is measurably slow.
 - **Cost attribution across a trace** (splitting one request's cost across nested spans). Interesting
   and not v1 — it needs the DAG work that belongs to **#30-S**.
 - **Batching or queueing the writer.** Still deliberately synchronous. `v1-07`.
