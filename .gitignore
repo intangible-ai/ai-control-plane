@@ -1,0 +1,19 @@
+# Compiled binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Test and profiling output
+*.test
+*.out
+*.prof
+# Secrets. Nothing needs one until slice 06 (Anthropic key); the rule is here
+# from commit one because that is when adding it is free.
+.env
+.env.*
+!.env.example
+# Editor
+.vscode/
+.idea/
